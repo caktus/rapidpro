@@ -1178,14 +1178,21 @@ class ContactsEndpoint(ListAPIMixin, WriteAPIMixin, DeleteAPIMixin, BaseAPIView)
 
     ## Listing Contacts
 
-    A **GET** returns the list of contacts for your organization, in the order of last activity date. You can return
-    only deleted contacts by passing the "deleted=true" parameter to your call.
+    A **GET** returns the list of contacts for your organization, in the order of last activity date. 
+    
+    You can return only deleted contacts by passing the "deleted=true" parameter to your call.
+    Otherwise, only undeleted contacts are returned.
+    
+    You can return only contacts in a group by passing "group=<groupname>" or "group=<uuid>".
+    
+    You can return only contacts in any of a set of groups by passing "groups=<uuid>,<uuid>".
+    (UUIDs are required because group names can contain commas.)
 
      * **uuid** - the UUID of the contact (string), filterable as `uuid`.
      * **name** - the name of the contact (string).
      * **language** - the preferred language of the contact (string).
      * **urns** - the URNs associated with the contact (string array), filterable as `urn`.
-     * **groups** - the UUIDs of any groups the contact is part of (array of objects), filterable as `group` with group name or UUID.
+     * **groups** - the UUIDs of any groups the contact is part of (array of objects), filterable as `group` with group name or UUID. or as `groups` with a comma-separated list of group names or UUIDs.
      * **fields** - any contact fields on this contact (dictionary).
      * **blocked** - whether the contact is blocked (boolean).
      * **stopped** - whether the contact is stopped, i.e. has opted out (boolean).
@@ -1329,6 +1336,15 @@ class ContactsEndpoint(ListAPIMixin, WriteAPIMixin, DeleteAPIMixin, BaseAPIView)
             group = ContactGroup.user_groups.filter(org=org).filter(Q(uuid=group_ref) | Q(name=group_ref)).first()
             if group:
                 queryset = queryset.filter(all_groups=group)
+            else:
+                queryset = queryset.filter(pk=-1)
+
+        # filter by group uuids (optional)
+        groups_ref = params.get('groups')
+        if groups_ref:
+            groups = ContactGroup.user_groups.filter(org=org, uuid__in=groups_ref.split(','))
+            if groups.exists():
+                queryset = queryset.filter(all_groups__in=groups).distinct()
             else:
                 queryset = queryset.filter(pk=-1)
 

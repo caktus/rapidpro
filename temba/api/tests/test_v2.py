@@ -1017,6 +1017,8 @@ class APITest(TembaTest):
         group.update_contacts(self.user, [self.joe], add=True)  # add contacts separately for predictable modified_on
         group.update_contacts(self.user, [contact4], add=True)  # ordering
 
+        group2 = ContactGroup.get_or_create(self.org, self.admin, "Users")
+
         contact1.refresh_from_db()
         contact4.refresh_from_db()
         self.joe.refresh_from_db()
@@ -1064,6 +1066,20 @@ class APITest(TembaTest):
         # filter by group UUID
         response = self.fetchJSON(url, 'group=%s' % group.uuid)
         self.assertResultsByUUID(response, [contact4, self.joe])
+
+        # filter by multiple group names
+        # Create a contact5 that's in group2, then query for both groups.
+        contact5 = self.create_contact("Ed", "0788000005")
+        group2.update_contacts(self.user, [contact5], add=True)
+        response = self.fetchJSON(url, 'groups=%s,%s' % (group.uuid, group2.uuid))
+        self.assertResultsByUUID(response, [contact5, contact4, self.joe])
+
+        # Add contact5 to the first group too.  It should still only be returned once.
+        group.update_contacts(self.user, [contact5], add=True)
+        response = self.fetchJSON(url, 'groups=%s,%s' % (group.uuid, group2.uuid))
+        self.assertResultsByUUID(response, [contact5, contact4, self.joe])
+
+        contact5.delete()
 
         # filter by invalid group
         response = self.fetchJSON(url, 'group=invalid')
